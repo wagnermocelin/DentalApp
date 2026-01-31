@@ -10,7 +10,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  UserCog
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -26,6 +27,7 @@ const Layout = ({ children }) => {
     { path: '/prontuarios', icon: FileText, label: 'Prontuários' },
     { path: '/atendimento', icon: ClipboardList, label: 'Atendimento' },
     { path: '/financeiro', icon: DollarSign, label: 'Financeiro' },
+    { path: '/usuarios', icon: UserCog, label: 'Usuários' },
     { path: '/configuracoes', icon: Settings, label: 'Configurações' },
   ]
 

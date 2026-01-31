@@ -18,11 +18,15 @@ import {
   AlertCircle,
   PlayCircle,
   PauseCircle,
-  ChevronRight
+  ChevronRight,
+  FilePlus,
+  ClipboardCheck
 } from 'lucide-react'
 import ModalOrcamento from '../components/ModalOrcamento'
 import ModalTratamento from '../components/ModalTratamento'
 import ModalSessao from '../components/ModalSessaoNovo'
+import ModalReceita from '../components/ModalReceita'
+import ModalAtestado from '../components/ModalAtestado'
 
 const Atendimento = () => {
   const [activeTab, setActiveTab] = useState('orcamentos')
@@ -557,6 +561,28 @@ const Atendimento = () => {
                               </button>
                             )}
                             <button
+                              onClick={() => {
+                                setSelectedItem(item)
+                                setModalType('receita')
+                                setShowModal(true)
+                              }}
+                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Emitir receita"
+                            >
+                              <FilePlus size={18} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedItem(item)
+                                setModalType('atestado')
+                                setShowModal(true)
+                              }}
+                              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                              title="Emitir atestado"
+                            >
+                              <ClipboardCheck size={18} />
+                            </button>
+                            <button
                               onClick={() => abrirModalTratamento(item)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               title="Ver detalhes"
@@ -618,6 +644,44 @@ const Atendimento = () => {
             setShowModal(false)
             setSelectedItem(null)
             carregarDados()
+          }}
+        />
+      )}
+
+      {showModal && modalType === 'receita' && selectedItem && (
+        <ModalReceita
+          paciente={{
+            id: selectedItem.paciente_id,
+            nome: selectedItem.pacientes?.nome || 'Paciente',
+            cpf: selectedItem.pacientes?.cpf || null
+          }}
+          tratamento={selectedItem}
+          onClose={() => {
+            setShowModal(false)
+            setSelectedItem(null)
+          }}
+          onSave={() => {
+            setShowModal(false)
+            setSelectedItem(null)
+          }}
+        />
+      )}
+
+      {showModal && modalType === 'atestado' && selectedItem && (
+        <ModalAtestado
+          paciente={{
+            id: selectedItem.paciente_id,
+            nome: selectedItem.pacientes?.nome || 'Paciente',
+            cpf: selectedItem.pacientes?.cpf || null
+          }}
+          tratamento={selectedItem}
+          onClose={() => {
+            setShowModal(false)
+            setSelectedItem(null)
+          }}
+          onSave={() => {
+            setShowModal(false)
+            setSelectedItem(null)
           }}
         />
       )}

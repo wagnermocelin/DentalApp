@@ -158,6 +158,70 @@ CREATE TABLE IF NOT EXISTS sessao_procedimentos (
 );
 
 -- ============================================
+-- TABELAS: RECEITAS E ATESTADOS
+-- ============================================
+
+-- TABELA: receitas
+CREATE TABLE IF NOT EXISTS receitas (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  paciente_id UUID REFERENCES pacientes(id) ON DELETE CASCADE,
+  tratamento_id UUID REFERENCES tratamentos(id) ON DELETE SET NULL,
+  data_emissao DATE NOT NULL DEFAULT CURRENT_DATE,
+  medicamentos TEXT NOT NULL,
+  observacoes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- TABELA: atestados
+CREATE TABLE IF NOT EXISTS atestados (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  paciente_id UUID REFERENCES pacientes(id) ON DELETE CASCADE,
+  tratamento_id UUID REFERENCES tratamentos(id) ON DELETE SET NULL,
+  data_emissao DATE NOT NULL DEFAULT CURRENT_DATE,
+  data_inicio DATE NOT NULL,
+  data_fim DATE NOT NULL,
+  dias INTEGER NOT NULL,
+  cid VARCHAR(10),
+  motivo TEXT NOT NULL,
+  observacoes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- TABELAS: USUÁRIOS E DENTISTAS
+-- ============================================
+
+-- TABELA: usuarios
+CREATE TABLE IF NOT EXISTS usuarios (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  auth_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  nome VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('dentista', 'administrativo', 'admin')),
+  ativo BOOLEAN DEFAULT true,
+  cro VARCHAR(20),
+  especialidade VARCHAR(255),
+  telefone VARCHAR(20),
+  endereco TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Adicionar campos de dentista nas receitas e atestados
+ALTER TABLE receitas ADD COLUMN IF NOT EXISTS dentista_id UUID REFERENCES usuarios(id) ON DELETE SET NULL;
+ALTER TABLE atestados ADD COLUMN IF NOT EXISTS dentista_id UUID REFERENCES usuarios(id) ON DELETE SET NULL;
+
+-- Adicionar campo de dentista em agendamentos (se a tabela existir)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'agendamentos') THEN
+    ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS dentista_id UUID REFERENCES usuarios(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+-- ============================================
 -- ÍNDICES
 -- ============================================
 
@@ -179,6 +243,28 @@ CREATE INDEX IF NOT EXISTS idx_tratamento_procedimentos_tratamento ON tratamento
 CREATE INDEX IF NOT EXISTS idx_sessoes_tratamento ON sessoes_tratamento(tratamento_id);
 CREATE INDEX IF NOT EXISTS idx_sessoes_agendamento ON sessoes_tratamento(agendamento_id);
 CREATE INDEX IF NOT EXISTS idx_sessao_procedimentos_sessao ON sessao_procedimentos(sessao_id);
+
+-- Receitas e Atestados
+CREATE INDEX IF NOT EXISTS idx_receitas_paciente ON receitas(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_receitas_tratamento ON receitas(tratamento_id);
+CREATE INDEX IF NOT EXISTS idx_receitas_dentista ON receitas(dentista_id);
+CREATE INDEX IF NOT EXISTS idx_atestados_paciente ON atestados(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_atestados_tratamento ON atestados(tratamento_id);
+CREATE INDEX IF NOT EXISTS idx_atestados_dentista ON atestados(dentista_id);
+
+-- Usuários
+CREATE INDEX IF NOT EXISTS idx_usuarios_auth_user ON usuarios(auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_usuarios_tipo ON usuarios(tipo);
+CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
+CREATE INDEX IF NOT EXISTS idx_usuarios_ativo ON usuarios(ativo);
+
+-- Agendamentos (se a tabela existir)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'agendamentos') THEN
+    CREATE INDEX IF NOT EXISTS idx_agendamentos_dentista ON agendamentos(dentista_id);
+  END IF;
+END $$;
 
 -- ============================================
 -- TRIGGERS
@@ -210,6 +296,20 @@ DROP TRIGGER IF EXISTS update_sessoes_tratamento_updated_at ON sessoes_tratament
 CREATE TRIGGER update_sessoes_tratamento_updated_at BEFORE UPDATE ON sessoes_tratamento
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Receitas e Atestados
+DROP TRIGGER IF EXISTS update_receitas_updated_at ON receitas;
+CREATE TRIGGER update_receitas_updated_at BEFORE UPDATE ON receitas
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_atestados_updated_at ON atestados;
+CREATE TRIGGER update_atestados_updated_at BEFORE UPDATE ON atestados
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Usuários
+DROP TRIGGER IF EXISTS update_usuarios_updated_at ON usuarios;
+CREATE TRIGGER update_usuarios_updated_at BEFORE UPDATE ON usuarios
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================
@@ -227,6 +327,13 @@ ALTER TABLE tratamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tratamento_procedimentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessoes_tratamento ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessao_procedimentos ENABLE ROW LEVEL SECURITY;
+
+-- Receitas e Atestados
+ALTER TABLE receitas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE atestados ENABLE ROW LEVEL SECURITY;
+
+-- Usuários
+ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- POLÍTICAS
@@ -272,6 +379,24 @@ CREATE POLICY "Permitir todas operações" ON sessoes_tratamento
 
 DROP POLICY IF EXISTS "Permitir todas operações" ON sessao_procedimentos;
 CREATE POLICY "Permitir todas operações" ON sessao_procedimentos
+    FOR ALL USING (auth.role() = 'authenticated');
+
+-- Receitas e Atestados
+DROP POLICY IF EXISTS "Permitir todas operações" ON receitas;
+CREATE POLICY "Permitir todas operações" ON receitas
+    FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Permitir todas operações" ON atestados;
+CREATE POLICY "Permitir todas operações" ON atestados
+    FOR ALL USING (auth.role() = 'authenticated');
+
+-- Usuários
+DROP POLICY IF EXISTS "Permitir leitura para autenticados" ON usuarios;
+CREATE POLICY "Permitir leitura para autenticados" ON usuarios
+    FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Permitir todas operações" ON usuarios;
+CREATE POLICY "Permitir todas operações" ON usuarios
     FOR ALL USING (auth.role() = 'authenticated');
 
 -- ============================================
@@ -352,6 +477,13 @@ INSERT INTO procedimentos_padrao (nome, categoria, valor_sugerido, duracao_estim
 ('Raspagem Periodontal', 'Periodontia', 400.00, 60, 'Raspagem e alisamento radicular por quadrante'),
 ('Cirurgia Periodontal', 'Periodontia', 1000.00, 90, 'Cirurgia periodontal para tratamento de bolsas')
 ON CONFLICT DO NOTHING;
+
+-- ============================================
+-- DADOS - USUÁRIO ADMIN PADRÃO
+-- ============================================
+INSERT INTO usuarios (nome, email, tipo, ativo) VALUES
+('Administrador', 'teste@dentalapp.com', 'admin', true)
+ON CONFLICT (email) DO NOTHING;
 
 -- ============================================
 -- VERIFICAÇÃO FINAL

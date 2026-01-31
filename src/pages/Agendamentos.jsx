@@ -10,12 +10,17 @@ import {
   X,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  FileText
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 const Agendamentos = () => {
+  const navigate = useNavigate()
   const [agendamentos, setAgendamentos] = useState([])
   const [pacientes, setPacientes] = useState([])
+  const [dentistas, setDentistas] = useState([])
+  const [dentistaFiltro, setDentistaFiltro] = useState('todos')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showModal, setShowModal] = useState(false)
@@ -24,6 +29,7 @@ const Agendamentos = () => {
 
   const [formData, setFormData] = useState({
     paciente_id: '',
+    dentista_id: '',
     data: '',
     hora_inicio: '',
     hora_fim: '',
@@ -34,26 +40,37 @@ const Agendamentos = () => {
 
   useEffect(() => {
     carregarDados()
-  }, [currentDate, viewMode])
+  }, [currentDate, viewMode, dentistaFiltro])
 
   const carregarDados = async () => {
     try {
       const startDate = getStartDate()
       const endDate = getEndDate()
 
-      const [agendamentosData, pacientesData] = await Promise.all([
+      let agendamentosQuery = supabase
+        .from('agendamentos')
+        .select('*, pacientes(nome), usuarios(nome, cro)')
+        .gte('data', startDate)
+        .lte('data', endDate)
+
+      if (dentistaFiltro !== 'todos') {
+        agendamentosQuery = agendamentosQuery.eq('dentista_id', dentistaFiltro)
+      }
+
+      const [agendamentosData, pacientesData, dentistasData] = await Promise.all([
+        agendamentosQuery.order('data').order('hora_inicio'),
+        supabase.from('pacientes').select('id, nome').order('nome'),
         supabase
-          .from('agendamentos')
-          .select('*, pacientes(nome)')
-          .gte('data', startDate)
-          .lte('data', endDate)
-          .order('data')
-          .order('hora_inicio'),
-        supabase.from('pacientes').select('id, nome').order('nome')
+          .from('usuarios')
+          .select('id, nome, cro')
+          .eq('tipo', 'dentista')
+          .eq('ativo', true)
+          .order('nome')
       ])
 
       setAgendamentos(agendamentosData.data || [])
       setPacientes(pacientesData.data || [])
+      setDentistas(dentistasData.data || [])
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
@@ -170,9 +187,55 @@ const Agendamentos = () => {
     }
   }
 
+  const handleGerarOrcamento = async (agendamento) => {
+    try {
+      // Criar orçamento com dados do agendamento
+      const orcamentoData = {
+        paciente_id: agendamento.paciente_id,
+        data: new Date().toISOString().split('T')[0],
+        validade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
+        status: 'pendente',
+        observacoes: `Orçamento gerado a partir do agendamento de ${new Date(agendamento.data + 'T00:00:00').toLocaleDateString('pt-BR')}`
+      }
+
+      const { data: orcamento, error: orcamentoError } = await supabase
+        .from('orcamentos')
+        .insert([orcamentoData])
+        .select()
+        .single()
+
+      if (orcamentoError) throw orcamentoError
+
+      // Se houver procedimento no agendamento, adicionar como item
+      if (agendamento.procedimento) {
+        const itemData = {
+          orcamento_id: orcamento.id,
+          procedimento: agendamento.procedimento,
+          quantidade: 1,
+          valor_unitario: 0,
+          valor_total: 0,
+          observacoes: agendamento.observacoes || null
+        }
+
+        const { error: itemError } = await supabase
+          .from('orcamento_itens')
+          .insert([itemData])
+
+        if (itemError) throw itemError
+      }
+
+      alert('Orçamento criado com sucesso!')
+      navigate('/atendimento')
+    } catch (error) {
+      console.error('Erro ao gerar orçamento:', error)
+      alert('Erro ao gerar orçamento: ' + error.message)
+    }
+  }
+
   const resetForm = () => {
     setFormData({
       paciente_id: '',
+      dentista_id: '',
       data: '',
       hora_inicio: '',
       hora_fim: '',
@@ -309,7 +372,22 @@ const Agendamentos = () => {
             </button>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <select
+              value={dentistaFiltro}
+              onChange={(e) => setDentistaFiltro(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="todos">Todos os Dentistas</option>
+              {dentistas.map((dentista) => (
+                <option key={dentista.id} value={dentista.id}>
+                  {dentista.nome}
+                </option>
+              ))}
+            </select>
+
+            <div className="w-px h-8 bg-gray-300 mx-2"></div>
+
             <button
               onClick={() => setViewMode('day')}
               className={`px-4 py-2 rounded-lg transition-colors ${
@@ -392,6 +470,13 @@ const Agendamentos = () => {
                                   <option value="cancelado">Cancelado</option>
                                 </select>
                                 <button
+                                  onClick={() => handleGerarOrcamento(agendamento)}
+                                  className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                                  title="Gerar Orçamento"
+                                >
+                                  <FileText size={16} />
+                                </button>
+                                <button
                                   onClick={() => handleDelete(agendamento.id)}
                                   className="p-1 hover:bg-red-200 rounded transition-colors"
                                 >
@@ -441,6 +526,12 @@ const Agendamentos = () => {
                           </span>
                         </div>
                         <p className="text-sm">{agendamento.procedimento}</p>
+                        {agendamento.usuarios?.nome && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            🦷 Dr(a). {agendamento.usuarios.nome}
+                            {agendamento.usuarios.cro && ` - CRO: ${agendamento.usuarios.cro}`}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -459,8 +550,15 @@ const Agendamentos = () => {
                         <option value="cancelado">Cancelado</option>
                       </select>
                       <button
+                        onClick={() => handleGerarOrcamento(agendamento)}
+                        className="p-2 text-green-600 hover:bg-green-100 rounded transition-colors ml-2"
+                        title="Gerar Orçamento"
+                      >
+                        <FileText size={16} />
+                      </button>
+                      <button
                         onClick={() => handleDelete(agendamento.id)}
-                        className="p-2 hover:bg-red-200 rounded transition-colors ml-2"
+                        className="p-2 hover:bg-red-200 rounded transition-colors"
                       >
                         <X size={16} />
                       </button>
@@ -491,7 +589,7 @@ const Agendamentos = () => {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Paciente *
                   </label>
@@ -505,6 +603,24 @@ const Agendamentos = () => {
                     {pacientes.map((paciente) => (
                       <option key={paciente.id} value={paciente.id}>
                         {paciente.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dentista
+                  </label>
+                  <select
+                    value={formData.dentista_id}
+                    onChange={(e) => setFormData({ ...formData, dentista_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Selecione um dentista</option>
+                    {dentistas.map((dentista) => (
+                      <option key={dentista.id} value={dentista.id}>
+                        {dentista.nome} {dentista.cro ? `- CRO: ${dentista.cro}` : ''}
                       </option>
                     ))}
                   </select>

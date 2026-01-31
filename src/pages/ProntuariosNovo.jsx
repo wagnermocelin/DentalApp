@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Plus, Search, FileText, X, Calendar, User, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Plus, Search, FileText, X, Calendar, User, ChevronRight, ArrowLeft, FilePlus, ClipboardCheck, Printer, Eye } from 'lucide-react'
 
 const ProntuariosNovo = () => {
   const [pacientes, setPacientes] = useState([])
   const [pacienteSelecionado, setPacienteSelecionado] = useState(null)
   const [prontuarios, setProntuarios] = useState([])
+  const [receitas, setReceitas] = useState([])
+  const [atestados, setAtestados] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [selectedDente, setSelectedDente] = useState(null)
+  const [documentoSelecionado, setDocumentoSelecionado] = useState(null)
+  const [tipoDocumento, setTipoDocumento] = useState(null)
 
   const [formData, setFormData] = useState({
     paciente_id: '',
@@ -27,6 +31,8 @@ const ProntuariosNovo = () => {
   useEffect(() => {
     if (pacienteSelecionado) {
       carregarProntuariosPaciente(pacienteSelecionado.id)
+      carregarReceitasPaciente(pacienteSelecionado.id)
+      carregarAtestadosPaciente(pacienteSelecionado.id)
     }
   }, [pacienteSelecionado])
 
@@ -75,6 +81,36 @@ const ProntuariosNovo = () => {
       console.error('Erro ao carregar prontuários:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const carregarReceitasPaciente = async (pacienteId) => {
+    try {
+      const { data, error } = await supabase
+        .from('receitas')
+        .select('*')
+        .eq('paciente_id', pacienteId)
+        .order('data_emissao', { ascending: false })
+
+      if (error) throw error
+      setReceitas(data || [])
+    } catch (error) {
+      console.error('Erro ao carregar receitas:', error)
+    }
+  }
+
+  const carregarAtestadosPaciente = async (pacienteId) => {
+    try {
+      const { data, error } = await supabase
+        .from('atestados')
+        .select('*')
+        .eq('paciente_id', pacienteId)
+        .order('data_emissao', { ascending: false })
+
+      if (error) throw error
+      setAtestados(data || [])
+    } catch (error) {
+      console.error('Erro ao carregar atestados:', error)
     }
   }
 
@@ -430,6 +466,138 @@ const ProntuariosNovo = () => {
         </div>
       </div>
 
+      {/* Seção de Receitas */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <FilePlus className="text-purple-600" size={24} />
+              Receitas Emitidas ({receitas.length})
+            </h2>
+          </div>
+        </div>
+        <div className="p-6">
+          {receitas.length === 0 ? (
+            <div className="text-center py-12">
+              <FilePlus className="mx-auto text-gray-400 mb-3" size={48} />
+              <p className="text-gray-600">Nenhuma receita emitida ainda</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {receitas.map((receita) => (
+                <div
+                  key={receita.id}
+                  className="p-4 bg-purple-50 rounded-lg border border-purple-100"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Calendar size={14} />
+                          {new Date(receita.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </div>
+                      </div>
+                      <p className="font-medium text-gray-800 mb-2">Medicamentos Prescritos:</p>
+                      <div className="text-sm text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-purple-200 mb-2">
+                        {receita.medicamentos}
+                      </div>
+                      {receita.observacoes && (
+                        <p className="text-sm text-gray-600 italic">
+                          <strong>Obs:</strong> {receita.observacoes}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setDocumentoSelecionado(receita)
+                        setTipoDocumento('receita')
+                      }}
+                      className="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
+                      title="Visualizar e imprimir"
+                    >
+                      <Printer size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Seção de Atestados */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <ClipboardCheck className="text-orange-600" size={24} />
+              Atestados Emitidos ({atestados.length})
+            </h2>
+          </div>
+        </div>
+        <div className="p-6">
+          {atestados.length === 0 ? (
+            <div className="text-center py-12">
+              <ClipboardCheck className="mx-auto text-gray-400 mb-3" size={48} />
+              <p className="text-gray-600">Nenhum atestado emitido ainda</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {atestados.map((atestado) => (
+                <div
+                  key={atestado.id}
+                  className="p-4 bg-orange-50 rounded-lg border border-orange-100"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Calendar size={14} />
+                          Emissão: {new Date(atestado.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-700">
+                          <strong>Período de Afastamento:</strong>{' '}
+                          {new Date(atestado.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR')} até{' '}
+                          {new Date(atestado.data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          <strong>Dias:</strong> {atestado.dias} dia(s)
+                        </p>
+                        {atestado.cid && (
+                          <p className="text-sm text-gray-700">
+                            <strong>CID:</strong> {atestado.cid}
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-700">
+                          <strong>Motivo:</strong> {atestado.motivo}
+                        </p>
+                        {atestado.observacoes && (
+                          <p className="text-sm text-gray-600 italic">
+                            <strong>Obs:</strong> {atestado.observacoes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setDocumentoSelecionado(atestado)
+                        setTipoDocumento('atestado')
+                      }}
+                      className="p-2 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
+                      title="Visualizar e imprimir"
+                    >
+                      <Printer size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -537,6 +705,167 @@ const ProntuariosNovo = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal de Visualização de Documentos */}
+      {documentoSelecionado && (
+        <>
+          <style>{`
+            @media print {
+              body * {
+                visibility: hidden;
+              }
+              .print-documento, .print-documento * {
+                visibility: visible;
+              }
+              .print-documento {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+              }
+              .no-print-doc {
+                display: none !important;
+              }
+            }
+          `}</style>
+
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10 no-print-doc">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {tipoDocumento === 'receita' ? 'Receita Odontológica' : 'Atestado Odontológico'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setDocumentoSelecionado(null)
+                    setTipoDocumento(null)
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="p-6">
+                {/* Preview do Documento */}
+                <div className="print-documento border-2 border-gray-300 rounded-lg p-8 bg-white mb-6">
+                  <div className="text-center mb-8">
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                      {tipoDocumento === 'receita' ? 'RECEITA ODONTOLÓGICA' : 'ATESTADO ODONTOLÓGICO'}
+                    </h1>
+                    <div className="text-sm text-gray-600">
+                      <p>Dr(a). Nome do Dentista</p>
+                      <p>CRO: 12345</p>
+                      <p>Endereço da Clínica</p>
+                      <p>Telefone: (00) 0000-0000</p>
+                    </div>
+                  </div>
+
+                  {tipoDocumento === 'receita' ? (
+                    <>
+                      <div className="mb-6">
+                        <p className="text-sm text-gray-600">
+                          <strong>Data:</strong> {new Date(documentoSelecionado.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <strong>Paciente:</strong> {pacienteSelecionado.nome}
+                        </p>
+                      </div>
+
+                      <div className="mb-8">
+                        <p className="text-sm font-semibold text-gray-700 mb-3">Prescrição:</p>
+                        <div className="whitespace-pre-wrap text-sm text-gray-800 leading-relaxed border-l-4 border-purple-500 pl-4">
+                          {documentoSelecionado.medicamentos}
+                        </div>
+                      </div>
+
+                      {documentoSelecionado.observacoes && (
+                        <div className="mb-8">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">Observações:</p>
+                          <p className="text-sm text-gray-600 italic">{documentoSelecionado.observacoes}</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="mb-8 text-justify leading-relaxed">
+                        <p className="mb-4">
+                          Atesto para os devidos fins que o(a) paciente <strong>{pacienteSelecionado.nome}</strong>
+                          {pacienteSelecionado.cpf && `, CPF ${pacienteSelecionado.cpf},`} esteve sob meus cuidados profissionais
+                          e necessita de afastamento de suas atividades habituais pelo período de{' '}
+                          <strong>{documentoSelecionado.dias}</strong> dia(s),
+                          no período de{' '}
+                          <strong>{new Date(documentoSelecionado.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR')}</strong>
+                          {' '}a{' '}
+                          <strong>{new Date(documentoSelecionado.data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}</strong>.
+                        </p>
+
+                        {documentoSelecionado.motivo && (
+                          <p className="mb-4">
+                            <strong>Motivo:</strong> {documentoSelecionado.motivo}
+                          </p>
+                        )}
+
+                        {documentoSelecionado.cid && (
+                          <p className="mb-4">
+                            <strong>CID:</strong> {documentoSelecionado.cid}
+                          </p>
+                        )}
+
+                        {documentoSelecionado.observacoes && (
+                          <p className="mb-4 text-sm italic">
+                            <strong>Observações:</strong> {documentoSelecionado.observacoes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mt-16 text-right">
+                        <p className="text-sm text-gray-600 mb-8">
+                          {new Date(documentoSelecionado.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR', { 
+                            day: 'numeric', 
+                            month: 'long', 
+                            year: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="mt-16 pt-8 border-t border-gray-300">
+                    <div className="text-center">
+                      <div className="inline-block">
+                        <div className="border-t-2 border-gray-800 w-64 mb-2"></div>
+                        <p className="text-sm text-gray-700">Assinatura e Carimbo do Dentista</p>
+                        <p className="text-xs text-gray-600 mt-1">CRO: 12345</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botões */}
+                <div className="flex gap-3 no-print-doc">
+                  <button
+                    onClick={() => {
+                      setDocumentoSelecionado(null)
+                      setTipoDocumento(null)
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Printer size={20} />
+                    Imprimir
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

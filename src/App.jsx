@@ -10,6 +10,7 @@ import Agendamentos from './pages/Agendamentos'
 import Prontuarios from './pages/ProntuariosNovo'
 import Financeiro from './pages/FinanceiroNovo'
 import Atendimento from './pages/Atendimento'
+import Usuarios from './pages/Usuarios'
 import Configuracoes from './pages/Configuracoes'
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
                   <Route path="/prontuarios" element={<Prontuarios />} />
                   <Route path="/atendimento" element={<Atendimento />} />
                   <Route path="/financeiro" element={<Financeiro />} />
+                  <Route path="/usuarios" element={<Usuarios />} />
                   <Route path="/configuracoes" element={<Configuracoes />} />
                 </Routes>
               </Layout>

@@ -11,7 +11,11 @@ import {
   FileText,
   DollarSign,
   Clock,
-  Edit
+  Edit,
+  FilePlus,
+  ClipboardCheck,
+  Printer,
+  Eye
 } from 'lucide-react'
 
 const PacienteDetalhes = () => {
@@ -21,6 +25,8 @@ const PacienteDetalhes = () => {
   const [agendamentos, setAgendamentos] = useState([])
   const [prontuarios, setProntuarios] = useState([])
   const [pagamentos, setPagamentos] = useState([])
+  const [receitas, setReceitas] = useState([])
+  const [atestados, setAtestados] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('info')
 
