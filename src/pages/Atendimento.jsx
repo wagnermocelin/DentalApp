@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   ClipboardList,
@@ -29,6 +30,8 @@ import ModalReceita from '../components/ModalReceita'
 import ModalAtestado from '../components/ModalAtestado'
 
 const Atendimento = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('orcamentos')
   const [orcamentos, setOrcamentos] = useState([])
   const [tratamentos, setTratamentos] = useState([])
@@ -55,6 +58,21 @@ const Atendimento = () => {
   useEffect(() => {
     calcularEstatisticas()
   }, [orcamentos, tratamentos])
+
+  // Detectar se veio de agendamento para criar orçamento
+  useEffect(() => {
+    if (location.state?.novoOrcamento && pacientes.length > 0 && !showModal) {
+      const paciente = pacientes.find(p => p.id === location.state.pacienteId)
+      if (paciente) {
+        setSelectedItem({
+          pacientes: paciente,
+          paciente_id: location.state.pacienteId
+        })
+        setModalType('orcamento')
+        setShowModal(true)
+      }
+    }
+  }, [location.state, pacientes, showModal])
 
   const carregarDados = async () => {
     try {
@@ -603,17 +621,26 @@ const Atendimento = () => {
 
       {showModal && modalType === 'orcamento' && (
         <ModalOrcamento
-          orcamento={selectedItem}
+          orcamento={selectedItem?.id ? selectedItem : null}
+          pacienteInicial={selectedItem?.paciente_id}
           pacientes={pacientes}
           procedimentosPadrao={procedimentosPadrao}
           onClose={() => {
             setShowModal(false)
             setSelectedItem(null)
+            // Limpar state do location para evitar reabertura
+            if (location.state?.novoOrcamento) {
+              navigate('/atendimento', { replace: true })
+            }
           }}
           onSave={() => {
             setShowModal(false)
             setSelectedItem(null)
             carregarDados()
+            // Limpar state do location para evitar reabertura
+            if (location.state?.novoOrcamento) {
+              navigate('/atendimento', { replace: true })
+            }
           }}
         />
       )}

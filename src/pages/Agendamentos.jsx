@@ -187,49 +187,17 @@ const Agendamentos = () => {
     }
   }
 
-  const handleGerarOrcamento = async (agendamento) => {
-    try {
-      // Criar orçamento com dados do agendamento
-      const orcamentoData = {
-        paciente_id: agendamento.paciente_id,
-        data: new Date().toISOString().split('T')[0],
-        validade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
-        status: 'pendente',
+  const handleGerarOrcamento = (agendamento) => {
+    // Redirecionar para página de atendimento com dados do agendamento
+    navigate('/atendimento', {
+      state: {
+        novoOrcamento: true,
+        pacienteId: agendamento.paciente_id,
+        pacienteNome: agendamento.pacientes?.nome || agendamento.paciente_nome,
+        procedimento: agendamento.procedimento,
         observacoes: `Orçamento gerado a partir do agendamento de ${new Date(agendamento.data + 'T00:00:00').toLocaleDateString('pt-BR')}`
       }
-
-      const { data: orcamento, error: orcamentoError } = await supabase
-        .from('orcamentos')
-        .insert([orcamentoData])
-        .select()
-        .single()
-
-      if (orcamentoError) throw orcamentoError
-
-      // Se houver procedimento no agendamento, adicionar como item
-      if (agendamento.procedimento) {
-        const itemData = {
-          orcamento_id: orcamento.id,
-          procedimento: agendamento.procedimento,
-          quantidade: 1,
-          valor_unitario: 0,
-          valor_total: 0,
-          observacoes: agendamento.observacoes || null
-        }
-
-        const { error: itemError } = await supabase
-          .from('orcamento_itens')
-          .insert([itemData])
-
-        if (itemError) throw itemError
-      }
-
-      alert('Orçamento criado com sucesso!')
-      navigate('/atendimento')
-    } catch (error) {
-      console.error('Erro ao gerar orçamento:', error)
-      alert('Erro ao gerar orçamento: ' + error.message)
-    }
+    })
   }
 
   const resetForm = () => {

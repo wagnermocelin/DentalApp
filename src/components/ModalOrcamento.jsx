@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { X, Plus, Trash2, DollarSign } from 'lucide-react'
 
-const ModalOrcamento = ({ orcamento, pacientes, procedimentosPadrao, onClose, onSave }) => {
+const ModalOrcamento = ({ orcamento, pacientes, procedimentosPadrao, pacienteInicial, onClose, onSave }) => {
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    paciente_id: '',
+    paciente_id: pacienteInicial || '',
     data_orcamento: new Date().toISOString().split('T')[0],
     validade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     desconto: 0,
@@ -24,11 +24,16 @@ const ModalOrcamento = ({ orcamento, pacientes, procedimentosPadrao, onClose, on
         observacoes: orcamento.observacoes || ''
       })
       carregarItens()
+    } else if (pacienteInicial) {
+      setFormData(prev => ({
+        ...prev,
+        paciente_id: pacienteInicial
+      }))
     }
-  }, [orcamento])
+  }, [orcamento, pacienteInicial])
 
   const carregarItens = async () => {
-    if (!orcamento) return
+    if (!orcamento || !orcamento.id) return
 
     try {
       const { data } = await supabase
